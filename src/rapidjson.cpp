@@ -27,7 +27,7 @@
 #include "rapidjson/writer.h"
 
 
-#include "Userdata.hpp"
+//#include "Userdata.hpp"
 #include "values.hpp"
 #include "luax.hpp"
 #include "file.hpp"
@@ -398,10 +398,10 @@ static const luaL_Reg methods[] = {
 	{ "object", json_object },
 	{ "array", json_array },
 
-	// JSON types
-	{ "Document", Userdata<Document>::create },
-	{ "SchemaDocument", Userdata<SchemaDocument>::create },
-	{ "SchemaValidator", Userdata<SchemaValidator>::create },
+	// // JSON types
+	// { "Document", Userdata<Document>::create },
+	// { "SchemaDocument", Userdata<SchemaDocument>::create },
+	// { "SchemaValidator", Userdata<SchemaValidator>::create },
 
 	{NULL, NULL }
 };
@@ -427,9 +427,9 @@ LUALIB_API int luaopen_rapidjson(lua_State* L)
 	createSharedMeta(L, "json.object", "object");
 	createSharedMeta(L, "json.array", "array");
 
-	Userdata<Document>::luaopen(L);
-	Userdata<SchemaDocument>::luaopen(L);
-	Userdata<SchemaValidator>::luaopen(L);
+	// Userdata<Document>::luaopen(L);
+	// Userdata<SchemaDocument>::luaopen(L);
+	// Userdata<SchemaValidator>::luaopen(L);
 
 	return 1;
 }
