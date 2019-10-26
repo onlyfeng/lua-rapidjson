@@ -5,8 +5,11 @@
 #include <lua.hpp>
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/document.h>
+#include <rapidjson/reader.h>
+#include <rapidjson/error/en.h>
 
 #include "luax.hpp"
+#include "StringStream.hpp"
 
 namespace values {
 	typedef rapidjson::Document::AllocatorType Allocator;
@@ -223,22 +226,45 @@ namespace values {
 	};
 
 
-	// namespace details {
-	// 	rapidjson::Value toValue(lua_State* L, int idx, int depth, Allocator& allocator);
-	// }
+	namespace details {
+		rapidjson::Value toValue(lua_State* L, int idx, int depth, Allocator& allocator);
+	}
 
-	// inline rapidjson::Value toValue(lua_State* L, int idx, Allocator& allocator) {
-	// 	return details::toValue(L, idx, 0, allocator);
-	// }
+	inline rapidjson::Value toValue(lua_State* L, int idx, Allocator& allocator) {
+		return details::toValue(L, idx, 0, allocator);
+	}
 
-	// inline void toDocument(lua_State* L, int idx, rapidjson::Document* doc) {
-	// 	details::toValue(L, idx, 0, doc->GetAllocator()).Swap(*doc);
-	// }
+	inline void toDocument(lua_State* L, int idx, rapidjson::Document* doc) {
+		details::toValue(L, idx, 0, doc->GetAllocator()).Swap(*doc);
+	}
 
-	// inline void push(lua_State* L, const rapidjson::Value& v) {
-	// 	ToLuaHandler handler(L);
-	// 	v.Accept(handler);
-	// }
+	inline void pushValue(lua_State *L, const rapidjson::Value& v) {
+		ToLuaHandler handler(L);
+		v.Accept(handler);
+	}
+
+
+    template<typename Stream>
+    inline int pushDecoded(lua_State* L, Stream& s) {
+        int top = lua_gettop(L);
+        values::ToLuaHandler handler(L);
+        rapidjson::Reader reader;
+        rapidjson::ParseResult r = reader.Parse(s, handler);
+
+        if (!r) {
+            lua_settop(L, top);
+            lua_pushnil(L);
+            lua_pushfstring(L, "%s (%d)", rapidjson::GetParseError_En(r.Code()), r.Offset());
+            return 2;
+        }
+
+        return 1;
+    }
+
+    inline int pushDecoded(lua_State* L, const char* ptr, size_t len) {
+        rapidjson::extend::StringStream s(ptr, len);
+        return pushDecoded(L, s);
+	}
 }
 
 #endif // __LUA_RAPIDJSON_TOLUAHANDLER_HPP__
