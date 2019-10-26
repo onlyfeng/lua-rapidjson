@@ -226,17 +226,18 @@ namespace values {
 	};
 
 
-	namespace details {
-		rapidjson::Value toValue(lua_State* L, int idx, int depth, Allocator& allocator);
-	}
+	// for xLua compile 
+	// namespace details {
+	// 	rapidjson::Value toValue(lua_State* L, int idx, int depth, Allocator& allocator);
+	// }
 
-	inline rapidjson::Value toValue(lua_State* L, int idx, Allocator& allocator) {
-		return details::toValue(L, idx, 0, allocator);
-	}
+	// inline rapidjson::Value toValue(lua_State* L, int idx, Allocator& allocator) {
+	// 	return details::toValue(L, idx, 0, allocator);
+	// }
 
-	inline void toDocument(lua_State* L, int idx, rapidjson::Document* doc) {
-		details::toValue(L, idx, 0, doc->GetAllocator()).Swap(*doc);
-	}
+	// inline void toDocument(lua_State* L, int idx, rapidjson::Document* doc) {
+	// 	details::toValue(L, idx, 0, doc->GetAllocator()).Swap(*doc);
+	// }
 
 	inline void pushValue(lua_State *L, const rapidjson::Value& v) {
 		ToLuaHandler handler(L);

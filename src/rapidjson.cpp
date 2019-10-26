@@ -26,7 +26,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
-
+// for xLua compile, not include userdata
 //#include "Userdata.hpp"
 #include "values.hpp"
 #include "luax.hpp"
