@@ -91,7 +91,8 @@ static int json_array(lua_State* L)
 static int json_decode(lua_State* L)
 {
 	size_t len = 0;
-	const char*  contents = nullptr;
+	//const char*  contents = nullptr;
+	const char*  contents = 0;
 	switch(lua_type(L, 1)) {
 	case LUA_TSTRING:
 		contents = luaL_checklstring(L, 1, &len);
