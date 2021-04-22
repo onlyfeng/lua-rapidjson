@@ -189,18 +189,18 @@ private:
 		case LUA_TNIL:
 			writer->Null();
 			return;
-		case LUA_TFUNCTION:
+		case LUA_TLIGHTUSERDATA:
 			if (values::isnull(L, idx)) {
 				writer->Null();
 				return;
 			}
 			// otherwise fall thought
-		case LUA_TLIGHTUSERDATA: // fall thought
+		case LUA_TFUNCTION: // fall thought
 		case LUA_TUSERDATA: // fall thought
 		case LUA_TTHREAD: // fall thought
 		case LUA_TNONE: // fall thought
 		default:
-			luaL_error(L, "value type : %s", lua_typename(L, t));
+			luaL_error(L, "unsupported value type : %s", lua_typename(L, t));
 		}
 	}
 
@@ -213,28 +213,27 @@ private:
 		if (!lua_checkstack(L, 4)) // requires at least 4 slots in stack: table, key, value, key
 			luaL_error(L, "stack overflow");
 
-		lua_pushvalue(L, idx); // [table]
-		if (values::isarray(L, -1, empty_table_as_array))
+		idx = luax::absindex(L, idx);
+		if (values::isarray(L, idx, empty_table_as_array))
 		{
-			encodeArray(L, writer, depth);
-			lua_pop(L, 1); // []
+			encodeArray(L, writer, idx, depth);
 			return;
 		}
 
 		// is object.
 		if (!sort_keys)
 		{
-			encodeObject(L, writer, depth);
-			lua_pop(L, 1); // []
+			encodeObject(L, writer, idx, depth);
 			return;
 		}
 
-		lua_pushnil(L); // [table, nil]
-		std::vector<Key> keys;
 
-		while (lua_next(L, -2))
+		std::vector<Key> keys;
+		keys.reserve(luax::rawlen(L, idx));
+        lua_pushnil(L); // [nil]
+		while (lua_next(L, idx))
 		{
-			// [table, key, value]
+			// [key, value]
 
 			if (lua_type(L, -2) == LUA_TSTRING)
 			{
@@ -245,23 +244,23 @@ private:
 
 			// pop value, leaving original key
 			lua_pop(L, 1);
-			// [table, key]
+			// [key]
 		}
-		// [table]
-		encodeObject(L, writer, depth, keys);
-		lua_pop(L, 1);
+		// []
+		encodeObject(L, writer, idx, depth, keys);
 	}
 
 	template<typename Writer>
-	void encodeObject(lua_State* L, Writer* writer, int depth)
+	void encodeObject(lua_State* L, Writer* writer, int idx, int depth)
 	{
+        idx = luax::absindex(L, idx);
 		writer->StartObject();
 
-		// [table]
-		lua_pushnil(L); // [table, nil]
-		while (lua_next(L, -2))
+		// []
+		lua_pushnil(L); // [nil]
+		while (lua_next(L, idx))
 		{
-			// [table, key, value]
+			// [key, value]
 			if (lua_type(L, -2) == LUA_TSTRING)
 			{
 				size_t len = 0;
@@ -272,16 +271,17 @@ private:
 
 			// pop value, leaving original key
 			lua_pop(L, 1);
-			// [table, key]
+			// [key]
 		}
-		// [table]
+		// []
 		writer->EndObject();
 	}
 
 	template<typename Writer>
-	void encodeObject(lua_State* L, Writer* writer, int depth, std::vector<Key> &keys)
+	void encodeObject(lua_State* L, Writer* writer, int idx, int depth, std::vector<Key> &keys)
 	{
-		// [table]
+		// []
+		idx = luax::absindex(L, idx);
 		writer->StartObject();
 
 		std::sort(keys.begin(), keys.end());
@@ -291,29 +291,30 @@ private:
 		for (; i != e; ++i)
 		{
 			writer->Key(i->key, static_cast<SizeType>(i->size));
-			lua_pushlstring(L, i->key, i->size); // [table, key]
-			lua_gettable(L, -2); // [table, value]
+			lua_pushlstring(L, i->key, i->size); // [key]
+			lua_gettable(L, idx); // [value]
 			encodeValue(L, writer, -1, depth);
-			lua_pop(L, 1); // [table]
+			lua_pop(L, 1); // []
 		}
-		// [table]
+		// []
 		writer->EndObject();
 	}
 
 	template<typename Writer>
-	void encodeArray(lua_State* L, Writer* writer, int depth)
+	void encodeArray(lua_State* L, Writer* writer, int idx, int depth)
 	{
-		// [table]
+		// []
+        idx = luax::absindex(L, idx);
 		writer->StartArray();
-		int MAX = static_cast<int>(luax::rawlen(L, -1)); // lua_rawlen always returns value >= 0
+		int MAX = static_cast<int>(luax::rawlen(L, idx)); // lua_rawlen always returns value >= 0
 		for (int n = 1; n <= MAX; ++n)
 		{
-			lua_rawgeti(L, -1, n); // [table, element]
+			lua_rawgeti(L, idx, n); // [element]
 			encodeValue(L, writer, -1, depth);
-			lua_pop(L, 1); // [table]
+			lua_pop(L, 1); // []
 		}
 		writer->EndArray();
-		// [table]
+		// []
 	}
 
 public:
@@ -368,13 +369,13 @@ static int json_dump(lua_State* L)
 
 
 namespace values {
-	static int nullref = LUA_NOREF;
+	static intptr_t null = 0;
 	/**
-	* Returns rapidjson.null.
+	* Push a value equals rapidjson.null on to the stack.
 	*/
-	int json_null(lua_State* L)
+	int push_null(lua_State* L)
 	{
-		lua_rawgeti(L, LUA_REGISTRYINDEX, nullref);
+        lua_pushlightuserdata(L, &values::null);
 		return 1;
 	}
 }
@@ -388,8 +389,7 @@ static const luaL_Reg methods[] = {
 	{ "load", json_load },
 	{ "dump", json_dump },
 
-	// special tags and functions
-	{ "null", values::json_null },
+	// special functions
 	{ "object", json_object },
 	{ "array", json_array },
 
@@ -415,9 +415,8 @@ LUALIB_API int luaopen_rapidjson(lua_State* L)
 	lua_pushliteral(L, LUA_RAPIDJSON_VERSION); // [rapidjson, version]
 	lua_setfield(L, -2, "_VERSION"); // [rapidjson]
 
-	lua_getfield(L, -1, "null"); // [rapidjson, json.null]
-	values::nullref = luaL_ref(L, LUA_REGISTRYINDEX); // [rapidjson]
-
+    values::push_null(L); // [rapidjson, json.null]
+    lua_setfield(L, -2, "null"); // [rapidjson]
 
 	createSharedMeta(L, "json.object", "object");
 	createSharedMeta(L, "json.array", "array");

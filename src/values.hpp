@@ -14,15 +14,14 @@
 namespace values {
 	typedef rapidjson::Document::AllocatorType Allocator;
 
-	int json_null(lua_State* L);
+	int push_null(lua_State* L);
 
 	inline bool isnull(lua_State* L, int idx)
 	{
-		lua_pushvalue(L, idx); // [value]
-
-		json_null(L); // [value, json.null]
-		bool is = lua_rawequal(L, -1, -2) != 0;
-		lua_pop(L, 2); // []
+        idx = luax::absindex(L, idx);
+		push_null(L);
+		bool is = lua_rawequal(L, -1, idx) != 0;
+		lua_pop(L, 1); // []
 
 		return is;
 	}
@@ -51,15 +50,14 @@ namespace values {
 		if (hasJsonType(L, idx, arr)) // any table with a meta field __jsontype set to 'array' are arrays
 			return arr;
 
-		lua_pushvalue(L, idx);
+        idx = luax::absindex(L, idx);
 		lua_pushnil(L);
-		if (lua_next(L, -2) != 0) {
-			lua_pop(L, 3);
+		if (lua_next(L, idx) != 0) {
+			lua_pop(L, 2);
 
 			return luax::rawlen(L, idx) > 0; // any non empty table has length > 0 are treat as array.
 		}
 
-		lua_pop(L, 1);
 		// Now it comes empty table
 		return empty_table_as_array;
 	}
@@ -73,7 +71,7 @@ namespace values {
 		explicit ToLuaHandler(lua_State* aL) : L(aL) { stack_.reserve(32); }
 
 		bool Null() {
-			json_null(L);
+			push_null(L);
 			context_.submit(L);
 			return true;
 		}
